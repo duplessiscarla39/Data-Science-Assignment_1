@@ -1,0 +1,144 @@
+---
+title: "Inside Airbnb"
+author: "Carla du Plessis"
+date: "2026-03-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(leaflet)
+library(leaflet.extras)
+```
+
+# Read real "listings" dataset of Airbnb's situated in Cape Town 
+```{r}
+RealListings <- read.csv("C:/Users/duple/OneDrive/Documents/Data Science 874/Post-block Assignments/Airbnb Data/listings.csv")
+```
+
+# Visualize and accordingly clean the "price" column (and rows)
+```{r}
+# ── STEP 1: Parse the raw price string ────────────────────────────────────────
+# The price column is stored as a character string (e.g. "$2,315.00")
+# We strip the "$" and "," characters and convert to numeric
+RealListings <- RealListings %>%
+  mutate(price_clean = as.numeric(gsub("[$,]", "", price)))
+
+# ── STEP 2: Inspect before making any decisions ───────────────────────────────
+summary(RealListings$price_clean)
+sum(is.na(RealListings$price_clean))
+
+# Look at the cheapest and most expensive listings to sense-check extremes
+RealListings %>%
+  arrange(price_clean) %>%
+  select(name, neighbourhood_cleansed, room_type, price_clean) %>%
+  head(20)
+
+RealListings %>%
+  arrange(desc(price_clean)) %>%
+  select(name, neighbourhood_cleansed, room_type, price_clean) %>%
+  head(20)
+
+# ── STEP 3: Visualize the raw distribution ────────────────────────────────────
+# Log scale is used because price is right-skewed
+# This reveals whether extreme values are isolated outliers or part of the tail
+ggplot(RealListings %>% filter(!is.na(price_clean)),
+       aes(x = price_clean)) +
+  geom_histogram(bins = 100, fill = "steelblue", color = "white") +
+  scale_x_log10(labels = scales::comma) +
+  labs(title = "Raw Price Distribution (before cleaning)",
+       x = "Price per Night (ZAR, log scale)", y = "Count")
+
+# ── STEP 4: Investigate missing prices before dropping ────────────────────────
+# We check whether missing prices are associated with inactive listings
+# If so, dropping them loses no real market signal
+RealListings %>%
+  filter(is.na(price_clean)) %>%
+  summarise(
+    has_reviews      = sum(number_of_reviews > 0),
+    has_availability = sum(has_availability == "t"),
+    has_revenue      = sum(estimated_revenue_l365d > 0, na.rm = TRUE),
+    total_missing    = n()
+  )
+
+# ── STEP 5: Apply cleaning filters  ─────────────────────────
+RealListings_clean <- RealListings %>%
+  filter(
+    # Drop rows where price could not be parsed (scraping gaps or
+    # incomplete listings — confirmed above to have little/no activity)
+    !is.na(price_clean),
+    
+    # Drop listings priced at zero — not a realistic Airbnb price,
+    # likely placeholder or test listings that were never activated
+    price_clean > 0,
+    
+    # Drop extreme high-end outliers only if inspection (Step 2) showed
+    # them to be isolated errors. Adjust this threshold based on what
+    # you actually observed — genuine luxury listings should be kept
+    price_clean <= 50000
+  )
+
+# Report how many rows were retained vs dropped
+cat("Original rows:  ", nrow(RealListings), "\n")
+cat("Retained rows:  ", nrow(RealListings_clean), "\n")
+cat("Dropped rows:   ", nrow(RealListings) - nrow(RealListings_clean), "\n")
+
+# ── STEP 6: Visualize cleaned distribution ────────────────────────────────────
+# Compare against Step 3 to confirm cleaning had the intended effect
+ggplot(RealListings_clean, aes(x = price_clean)) +
+  geom_histogram(bins = 100, fill = "darkgreen", color = "white") +
+  scale_x_log10(labels = scales::comma) +
+  labs(title = "Cleaned Price Distribution",
+       x = "Price per Night (ZAR, log scale)", y = "Count")
+```
+# Check "estimated revenue" column in RealListings_clean dataset
+```{r}
+# ── Check completeness of estimated_revenue_l365d ────────────────────────────
+
+# Summary overview — shows min, max, NAs and distribution at a glance
+summary(RealListings_clean$estimated_revenue_l365d)
+
+# Exact counts broken down by value type
+RealListings_clean %>%
+  summarise(
+    total_rows    = n(),
+    na_count      = sum(is.na(estimated_revenue_l365d)),
+    zero_count    = sum(estimated_revenue_l365d == 0, na.rm = TRUE),
+    valid_count   = sum(estimated_revenue_l365d > 0, na.rm = TRUE),
+    pct_valid     = round(valid_count / total_rows * 100, 1)
+  )
+
+# Valid (> 0) — the listing has recorded booking activity and a meaningful revenue estimate
+# Zero — the listing exists but has no recorded bookings in the last year; Inside Airbnb cannot estimate revenue without occupancy data
+# NA — the value is entirely missing, likely because the listing was too new or inactive to be estimated at all
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
